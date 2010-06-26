@@ -1,0 +1,25 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=3133
+
+SYNOPSIS
+
+nmap map-you-like <Plug>(openbrowser-open)
+vmap map-you-like <Plug>(openbrowser-open)
+
+" In command-line
+:OpenBrowser http://google.com/
+
+
+ENVIRONMENTS
+
+We have tested on these environments.
+- Ubuntu 9.10 GNOME
+- Windows XP
+- Cygwin
+- Mac OS X
+
+Thanks for testing:
+- mfumi (Mac OS X)
+- iicebar (Windows XP)
+
+LATEST VERSION
+http://github.com/tyru/open-browser.vim
