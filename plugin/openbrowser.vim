@@ -54,7 +54,9 @@ elseif s:is_mswin
         return ['start']
     endfunction
     function! s:get_default_open_rules()
-        return {'start': '&shell &shellcmdflag {browser} {uri}'}
+        " If &shellslash == 1,
+        " `shellescape(uri)` uses single quotes not double quote.
+        return {'start': '&shell &shellcmdflag {browser} "openbrowser.vim" "{uri}"'}
     endfunction
 elseif s:is_unix
     function! s:get_default_open_commands()
@@ -96,31 +98,32 @@ endif
 
 " Open URL with `g:openbrowser_open_commands`.
 function! OpenBrowser(uri) "{{{
+    try
+        let uri = s:convert_uri(a:uri)
+    catch /^invalid$/
+        " Neither
+        " - File path
+        " - |urilib| has been installed and |urilib| determine a:uri is URI
+
+        let uri = a:uri
+
+        " ...But openbrowser should try to open!
+        " Because a:uri might be URI like "file://...".
+        " In this case, this is not file path and
+        " |urilib| might not have been installed :(.
+    endtry
+
     for browser in g:openbrowser_open_commands
         " NOTE: On MS Windows, 'start' command is not executable.
         if !executable(browser) && (s:is_mswin && browser !=# 'start' && !executable(browser))
             continue
         endif
 
-        if s:is_urilib_installed
-            let uri = urilib#new(a:uri, -1)
-            if type(uri) != type(-1)
-                call uri.scheme(get(g:openbrowser_fix_schemes, uri.scheme(), uri.scheme()))
-                call uri.host  (get(g:openbrowser_fix_hosts, uri.host(), uri.host()))
-                call uri.path  (get(g:openbrowser_fix_paths, uri.path(), uri.path()))
-                let uri_str = uri.to_string()
-            else
-                let uri_str = a:uri
-            endif
-        else
-            let uri_str = a:uri
-        endif
-
         if !has_key(g:openbrowser_open_rules, browser)
             continue
         endif
 
-        call system(s:expand_keyword(g:openbrowser_open_rules[browser], browser, uri_str))
+        call system(s:expand_keyword(g:openbrowser_open_rules[browser], browser, uri))
 
         let success = 0
         if v:shell_error ==# success
@@ -129,8 +132,30 @@ function! OpenBrowser(uri) "{{{
     endfor
 
     echohl WarningMsg
-    echomsg printf("open-browser doesn't know how to open '%s'.", a:uri)
+    echomsg printf("open-browser doesn't know how to open '%s'.", uri)
     echohl None
+endfunction "}}}
+
+function! s:convert_uri(uri) "{{{
+    if getftype(a:uri) =~# '^\(file\|dir\|link\)$'
+        " a:uri is File path. Converts a:uri to `file://` URI.
+        let save_shellslash = &shellslash
+        let &l:shellslash = 1
+        try
+            return 'file:///' . fnamemodify(a:uri, ':p')
+        finally
+            let &l:shellslash = save_shellslash
+        endtry
+    elseif s:is_urilib_installed && urilib#is_uri(a:uri)
+        " a:uri is URI.
+        let uri = urilib#new(a:uri)
+        call uri.scheme(get(g:openbrowser_fix_schemes, uri.scheme(), uri.scheme()))
+        call uri.host  (get(g:openbrowser_fix_hosts, uri.host(), uri.host()))
+        call uri.path  (get(g:openbrowser_fix_paths, uri.path(), uri.path()))
+        return uri.to_string()
+    else
+        throw 'invalid'
+    endif
 endfunction "}}}
 
 " Get selected text in visual mode.
