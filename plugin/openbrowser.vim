@@ -51,12 +51,13 @@ elseif s:is_macunix
     endfunction
 elseif s:is_mswin
     function! s:get_default_open_commands()
-        return ['start']
+        return ['cmd.exe']
     endfunction
     function! s:get_default_open_rules()
-        " If &shellslash == 1,
+        " NOTE: On MS Windows, 'start' command is not executable.
+        " NOTE: If &shellslash == 1,
         " `shellescape(uri)` uses single quotes not double quote.
-        return {'start': '&shell &shellcmdflag {browser} "openbrowser.vim" "{uri}"'}
+        return {'cmd.exe': 'cmd /c start "openbrowser.vim" "{uri}"'}
     endfunction
 elseif s:is_unix
     function! s:get_default_open_commands()
@@ -89,8 +90,41 @@ endif
 if !exists('g:openbrowser_fix_paths')
     let g:openbrowser_fix_paths = {}
 endif
-if !exists('g:openbrowser_isfname')
-    let g:openbrowser_isfname = &isfname
+if exists('g:openbrowser_isfname')
+    " Backward compatibility.
+    let g:openbrowser_iskeyword = g:openbrowser_isfname
+endif
+if !exists('g:openbrowser_iskeyword')
+    " Getting only URI from <cfile>.
+    let g:openbrowser_iskeyword = join(
+    \   range(char2nr('A'), char2nr('Z'))
+    \   + range(char2nr('a'), char2nr('z'))
+    \   + range(char2nr('0'), char2nr('9'))
+    \   + [
+    \   '_',
+    \   ':',
+    \   '/',
+    \   '.',
+    \   '-',
+    \   '+',
+    \   '%',
+    \   '#',
+    \   '?',
+    \   '&',
+    \   '=',
+    \   ';',
+    \   '@',
+    \   '$',
+    \   ',',
+    \   '[',
+    \   ']',
+    \   '!',
+    \   "'",
+    \   "(",
+    \   ")",
+    \   "*",
+    \   "~",
+    \], ',')
 endif
 " }}}
 
@@ -98,24 +132,12 @@ endif
 
 " Open URL with `g:openbrowser_open_commands`.
 function! OpenBrowser(uri) "{{{
-    try
-        let uri = s:convert_uri(a:uri)
-    catch /^invalid$/
-        " Neither
-        " - File path
-        " - |urilib| has been installed and |urilib| determine a:uri is URI
-
-        let uri = a:uri
-
-        " ...But openbrowser should try to open!
-        " Because a:uri might be URI like "file://...".
-        " In this case, this is not file path and
-        " |urilib| might not have been installed :(.
-    endtry
+    let uri = s:convert_uri(a:uri)
+    redraw
+    echo "opening '" . uri . "' ..."
 
     for browser in g:openbrowser_open_commands
-        " NOTE: On MS Windows, 'start' command is not executable.
-        if !executable(browser) && (s:is_mswin && browser !=# 'start' && !executable(browser))
+        if !executable(browser)
             continue
         endif
 
@@ -127,12 +149,15 @@ function! OpenBrowser(uri) "{{{
 
         let success = 0
         if v:shell_error ==# success
+            redraw
+            echo "opening '" . uri . "' ... done! (" . browser . ")"
             return
         endif
     endfor
 
     echohl WarningMsg
-    echomsg printf("open-browser doesn't know how to open '%s'.", uri)
+    redraw
+    echomsg "open-browser doesn't know how to open '" . uri . "'."
     echohl None
 endfunction "}}}
 
@@ -154,7 +179,15 @@ function! s:convert_uri(uri) "{{{
         call uri.path  (get(g:openbrowser_fix_paths, uri.path(), uri.path()))
         return uri.to_string()
     else
-        throw 'invalid'
+        " Neither
+        " - File path
+        " - |urilib| has been installed and |urilib| determine a:uri is URI
+
+        " ...But openbrowser should try to open!
+        " Because a:uri might be URI like "file://...".
+        " In this case, this is not file path and
+        " |urilib| might not have been installed :(.
+        return a:uri
     endif
 endfunction "}}}
 
@@ -172,12 +205,12 @@ function! s:get_selected_text() "{{{
 endfunction "}}}
 
 function! s:get_url_on_cursor() "{{{
-    let save_isfname = &isfname
-    let &isfname = g:openbrowser_isfname
+    let save_iskeyword = &iskeyword
+    let &l:iskeyword = g:openbrowser_iskeyword
     try
-        return expand('<cfile>')
+        return expand('<cword>')
     finally
-        let &isfname = save_isfname
+        let &l:iskeyword = save_iskeyword
     endtry
 endfunction "}}}
 
