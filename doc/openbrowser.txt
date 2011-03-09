@@ -3,19 +3,7 @@
 Author:
   tyru <tyru.exe@gmail.com>
 Version: 0.0.2
-License:
-" NEW BSD LICENSE {{{
-"   Copyright (c) 2009, tyru
-"   All rights reserved.
-"
-"   Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-"
-"       * Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-"       * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
-"       * Neither the name of the tyru nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
-"
-"   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-" }}}
+License: Under the same license as Vim itself (see :help license)
 
 ==============================================================================
 CONTENTS						*openbrowser-contents*
@@ -25,6 +13,7 @@ Interface			|openbrowser-interface|
   Keymappings		|openbrowser-keymappings|
   Variables			|openbrowser-variables|
   Commands			|openbrowser-commands|
+  Functions			|openbrowser-functions|
 Library to enhance open-browser		|openbrowser-library|
 Platform dependent values		|openbrowser-platform-dependent|
 Changelog			|openbrowser-changelog|
@@ -122,12 +111,54 @@ g:openbrowser_isfname				*g:openbrowser_isfname*
 								(default: Same as 'isfname')
 	|<Plug>(openbrowser-open)| opens <cfile> text in normal mode.
 	This variable temporarily changes 'isfname' option value at that time.
+
+g:openbrowser_default_search		*g:openbrowser_default_search*
+								(default: "google")
+	Key of Dictionary |g:openbrowser_search_engines|.
+	See |g:openbrowser_search_engines| , |:OpenBrowserSearch|,
+	|OpenBrowserSearch()|.
+
+g:openbrowser_search_engines		*g:openbrowser_search_engines*
+								(default: See below)
+	Default value is: >
+    let g:openbrowser_search_engines = {
+    \   'google': 'http://google.com/search?q={query}',
+    \   'yahoo': 'http://search.yahoo.com/search?p={query}',
+    \}
+<
+	As default, supported search engines are Google and Yahoo.
+	You can add favorite search engines like: >
+    let g:openbrowser_search_engines = {
+    \   'favorite': 'http://example.com/search?q={query}',
+    \}
+<	{query} will be replaced with given query.
+
 }}}
 ------------------------------------------------------------------------------
 COMMANDS					*openbrowser-commands* {{{
 
-OpenBrowser {uri}
-	Open URI with your favorite browser.
+:OpenBrowser {uri}				*:OpenBrowser*
+	Opens URI with your favorite browser.
+
+:OpenBrowserSearch [-{search-engine}] {query}		*:OpenBrowserSearch*
+	{query}: Query string
+	{search-engine}: >
+		:OpenBrowserSearch -yahoo word
+<	This opens http://search.yahoo.com/search?p=word as default.
+	You can change this URI with |g:openbrowser_search_engines|.
+
+
+}}}
+------------------------------------------------------------------------------
+FUNCTIONS						*openbrowser-functions* {{{
+
+OpenBrowser({uri})				*OpenBrowser()*
+	Function version of |:OpenBrowser|.
+
+OpenBrowserSearch({query} [, {search-engine}])		*OpenBrowserSearch()*
+	Function version of |:OpenBrowserSearch|.
+	If {search-engine} is omitted,
+	|g:openbrowser_default_search| is used instead.
 
 }}}
 }}}
@@ -203,6 +234,16 @@ variable |g:openbrowser_isfname| is still available for
 backward compatibility.
 - Specialize |g:openbrowser_iskeyword| value to get URI in <cword>.
 - More readable messages.
+
+0.0.3:
+- Implement g:openbrowser_default_search.
+- Implement g:openbrowser_search_engines.
+- Implement g:openbrowser_open_filepath_in_vim.
+- Implement g:openbrowser_open_vim_command.
+- Separate plugin/openbrowser.vim to autoload/openbrowser.vim to save the memory.
+- Bundle urilib.vim (autoload/urilib.vim)
+- Fix bug: openbrowser should open URI which has no scheme
+  (e.g.: example.com)
 
 }}}
 ==============================================================================
