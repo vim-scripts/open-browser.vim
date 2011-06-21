@@ -57,7 +57,10 @@ if !exists('g:openbrowser_open_rules')
     let g:openbrowser_open_rules = s:get_default_open_rules()
 endif
 if !exists('g:openbrowser_fix_schemes')
-    let g:openbrowser_fix_schemes = {'ttp': 'http'}
+    let g:openbrowser_fix_schemes = {
+    \   'ttp': 'http',
+    \   'ttps': 'https',
+    \}
 endif
 if !exists('g:openbrowser_fix_hosts')
     let g:openbrowser_fix_hosts = {}
@@ -70,7 +73,7 @@ if exists('g:openbrowser_isfname')
     let g:openbrowser_iskeyword = g:openbrowser_isfname
 endif
 if !exists('g:openbrowser_iskeyword')
-    " Getting only URI from <cfile>.
+    " Getting only URI from <cword>.
     let g:openbrowser_iskeyword = join(
     \   range(char2nr('A'), char2nr('Z'))
     \   + range(char2nr('a'), char2nr('z'))
@@ -127,11 +130,16 @@ endif
 
 " Functions {{{
 
+function! openbrowser#load() "{{{
+    " dummy function to load this file.
+endfunction "}}}
+
+
+
 function! openbrowser#open(uri) "{{{
     if a:uri =~# '^\s*$'
         return
     endif
-
     if g:openbrowser_open_filepath_in_vim && s:seems_path(a:uri)
         execute g:openbrowser_open_vim_command a:uri
         return
@@ -145,19 +153,21 @@ function! openbrowser#open(uri) "{{{
         if !executable(browser)
             continue
         endif
-
         if !has_key(g:openbrowser_open_rules, browser)
             continue
         endif
 
-        call system(s:expand_keyword(g:openbrowser_open_rules[browser], {'browser': browser, 'uri': uri}))
-
-        let success = 0
-        if v:shell_error ==# success
-            redraw
-            echo "opening '" . uri . "' ... done! (" . browser . ")"
-            return
-        endif
+        let cmdline = s:expand_keyword(
+        \   g:openbrowser_open_rules[browser],
+        \   {'browser': browser, 'uri': uri}
+        \)
+        call s:spawn_browser(cmdline)
+        " No need to check v:shell_error
+        " because browser is spawned in background process
+        " so can't check its return value.
+        redraw
+        echo "opening '" . uri . "' ... done! (" . browser . ")"
+        return
     endfor
 
     echohl WarningMsg
@@ -195,28 +205,38 @@ function! openbrowser#_cmd_open_browser_search(args) "{{{
     call call('OpenBrowserSearch', [args] + (engine ==# NONE ? [] : [engine]))
 endfunction "}}}
 
-function! openbrowser#_cmd_complete_open_browser_search(ArgLead, CmdLine, CursorPos) "{{{
+function! openbrowser#smart_search(query) "{{{
+    if s:seems_uri(a:query)
+        return openbrowser#open(a:query)
+    else
+        return openbrowser#search(a:query)
+    endif
+endfunction "}}}
+
+function! openbrowser#_cmd_complete_open_browser_search(unused1, cmdline, unused2) "{{{
     let r = '^\s*OpenBrowserSearch\s\+'
-    if a:CmdLine !~# r
+    if a:cmdline !~# r
         return
     endif
-    let cmdline = substitute(a:CmdLine, r, '', '')
+    let cmdline = substitute(a:cmdline, r, '', '')
 
-    let engine_options = map(keys(g:openbrowser_search_engines), '"-" . v:val')
-    if cmdline == ''
+    let engine_options = map(
+    \   sort(keys(g:openbrowser_search_engines)),
+    \   '"-" . v:val'
+    \)
+    if cmdline ==# '' || cmdline ==# '-'
+        " Return all search engines.
         return engine_options
     endif
 
-    if type(a:ArgLead) == type(0) || a:ArgLead == ''
-        return []
-    endif
+    " Inputting search engine.
+    " Find out which engine.
     for option in engine_options
-        if stridx(option, a:ArgLead) == 0
+        if stridx(option, cmdline) == 0
             return [option]
         endif
     endfor
 
-    " TODO
     return []
 endfunction "}}}
 
@@ -228,6 +248,22 @@ function! openbrowser#_keymapping_open(mode) "{{{
     endif
 endfunction "}}}
 
+function! openbrowser#_keymapping_search(mode) "{{{
+    if a:mode ==# 'n'
+        return openbrowser#search(expand('<cword>'))
+    else
+        return openbrowser#search(s:get_selected_text())
+    endif
+endfunction "}}}
+
+function! openbrowser#_keymapping_smart_search(mode) "{{{
+    if a:mode ==# 'n'
+        return openbrowser#smart_search(s:get_url_on_cursor())
+    else
+        return openbrowser#smart_search(s:get_selected_text())
+    endif
+endfunction "}}}
+
 function! s:seems_path(path) "{{{
     return
     \   stridx(a:path, 'file://') ==# 0
@@ -235,7 +271,11 @@ function! s:seems_path(path) "{{{
 endfunction "}}}
 
 function! s:seems_uri(uri) "{{{
-    return urilib#like_uri(a:uri)
+    let ERROR = []
+    let uri = urilib#new_from_uri_like_string(a:uri, ERROR)
+    return uri isnot ERROR
+    \   && uri.scheme() !=# ''
+    \   && uri.host() =~# '\.'
 endfunction "}}}
 
 function! s:convert_uri(uri) "{{{
@@ -254,11 +294,14 @@ function! s:convert_uri(uri) "{{{
     endif
 
     if s:seems_uri(a:uri)
-        let obj = urilib#new_from_uri_like_string(a:uri)
-        call obj.scheme(get(g:openbrowser_fix_schemes, obj.scheme(), obj.scheme()))
-        call obj.host  (get(g:openbrowser_fix_hosts, obj.host(), obj.host()))
-        call obj.path  (get(g:openbrowser_fix_paths, obj.path(), obj.path()))
-        return obj.to_string()
+        let ERROR = []
+        let obj = urilib#new_from_uri_like_string(a:uri, ERROR)
+        if obj isnot ERROR
+            call obj.scheme(get(g:openbrowser_fix_schemes, obj.scheme(), obj.scheme()))
+            call obj.host  (get(g:openbrowser_fix_hosts, obj.host(), obj.host()))
+            call obj.path  (get(g:openbrowser_fix_paths, obj.path(), obj.path()))
+            return obj.to_string()
+        endif
     endif
 
     " Neither
@@ -354,6 +397,16 @@ function! s:expand_keyword(str, options)  " {{{
   endwhile
   return result
 endfunction "}}}
+
+" Determine what is used for spawning browser. {{{
+if globpath(&rtp, 'autoload/vimproc.vim') != ''
+    let s:spawn_browser = function('vimproc#system_gui')
+else
+    function! s:spawn_browser(cmdline)
+        return system(a:cmdline . ' &')
+    endfunction
+endif
+" }}}
 
 " }}}
 
