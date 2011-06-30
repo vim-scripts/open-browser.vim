@@ -2,7 +2,7 @@
 
 Author:
   tyru <tyru.exe@gmail.com>
-Version: 0.0.4
+Version: 0.0.5
 License: Under the same license as Vim itself (see :help license)
 
 ==============================================================================
@@ -14,7 +14,6 @@ Interface			|openbrowser-interface|
   Variables			|openbrowser-variables|
   Commands			|openbrowser-commands|
   Functions			|openbrowser-functions|
-Library to enhance open-browser		|openbrowser-library|
 Platform dependent values		|openbrowser-platform-dependent|
 Changelog			|openbrowser-changelog|
 
@@ -22,13 +21,40 @@ Changelog			|openbrowser-changelog|
 ==============================================================================
 INTRODUCTION						*openbrowser-introduction* {{{
 
+
+I recommend this setting.
 >
+	" My setting.
+	let g:netrw_nogx = 1 " disable netrw's gx mapping.
+	nmap gx <Plug>(openbrowser-smart-search)
+	vmap gx <Plug>(openbrowser-smart-search)
+
+
+Usage:
+
+>
+	" Open URI under cursor.
 	nmap map-you-like <Plug>(openbrowser-open)
+	" Open selected URI.
 	vmap map-you-like <Plug>(openbrowser-open)
+
+	" Search word under cursor.
+	nmap map-you-like <Plug>(openbrowser-search)
+	" Search selected word. vmap map-you-like <Plug>(openbrowser-search)
+
+	" If it looks like URI, Open URI under cursor.
+	" Otherwise, Search word under cursor.
+	nmap map-you-like <Plug>(openbrowser-smart-search)
+	" If it looks like URI, Open selected URI.
+	" Otherwise, Search selected word.
+	vmap map-you-like <Plug>(openbrowser-smart-search)
 
 	" In command-line
 	:OpenBrowser http://google.com/
-<
+	:OpenBrowserSearch ggrks
+	:OpenBrowserSmartSearch http://google.com/
+	:OpenBrowserSmartSearch ggrks
+
 
 }}}
 ==============================================================================
@@ -72,9 +98,6 @@ g:openbrowser_open_rules			*g:openbrowser_open_rules*
 
 g:openbrowser_fix_schemes			*g:openbrowser_fix_schemes*
 								(default: {"ttp": "http"})
-	You can use this variable if you installed |urilib|.
-	See |openbrowser-library|.
-
 	If this value is default,
 	If you execute |<Plug>(openbrowser-open)| on URI like: >
 		ttp://google.com/
@@ -94,9 +117,6 @@ g:openbrowser_fix_schemes			*g:openbrowser_fix_schemes*
 
 g:openbrowser_fix_hosts				*g:openbrowser_fix_hosts*
 								(default: {})
-	You can use this variable if you installed |urilib|.
-	See |openbrowser-library|.
-
 	If this value is: >
 	{'google.com': 'yahoo.com'}
 <
@@ -107,9 +127,6 @@ g:openbrowser_fix_hosts				*g:openbrowser_fix_hosts*
 <
 g:openbrowser_fix_paths				*g:openbrowser_fix_paths*
 								(default: {})
-	You can use this variable if you installed |urilib|.
-	See |openbrowser-library|.
-
 	If this value is: >
 	{'/google': '/tyru'}
 <
@@ -118,7 +135,7 @@ g:openbrowser_fix_paths				*g:openbrowser_fix_paths*
 <	It is fixed to: >
 		http://twitter.com/tyru
 <
-	Note that this works on the URL like: >
+	Note that this works on the URI like: >
 		http://yahoo.com/google
 <	It is fixed to: >
 		http://yahoo.com/tyru
@@ -202,6 +219,7 @@ openbrowser#load()				*openbrowser#load()*
 
 OpenBrowser({uri})				*OpenBrowser()*
 	For backward compatibility.
+	Now it's same as |openbrowser#open()|.
 	Use |openbrowser#open()| instead.
 
 openbrowser#open({uri})			*openbrowser#open()*
@@ -209,6 +227,7 @@ openbrowser#open({uri})			*openbrowser#open()*
 
 OpenBrowserSearch({query} [, {search-engine}])		*OpenBrowserSearch()*
 	For backward compatibility.
+	Now it's same as |openbrowser#search()|.
 	Use |openbrowser#search()| instead.
 
 openbrowser#search({query} [, {search-engine}])			*openbrowser#search()*
@@ -216,18 +235,12 @@ openbrowser#search({query} [, {search-engine}])			*openbrowser#search()*
 	If {search-engine} is omitted,
 	|g:openbrowser_default_search| is used instead.
 
+openbrowser#smart_search({query} [, {search-engine}])			*openbrowser#smart_search()*
+	Function version of |:OpenBrowserSmartSearch|.
+	If {search-engine} is omitted,
+	|g:openbrowser_default_search| is used instead.
+
 }}}
-}}}
-==============================================================================
-LIBRARY TO ENHANCE OPEN-BROWSER		*openbrowser-library* {{{
-
-urilib.vim: http://github.com/tyru/urilib.vim
-
-If you installed |urilib|, you can use these variables:
-- |g:openbrowser_fix_schemes|
-- |g:openbrowser_fix_hosts|
-- |g:openbrowser_fix_paths|
-
 }}}
 ==============================================================================
 PLATFORM DEPENDENT VALUES		*openbrowser-platform-dependent* {{{
@@ -311,6 +324,14 @@ backward compatibility.
 - Change |g:openbrowser_fix_schemes| default value
   - Add pair: "ttps" => "https"
 - etc.
+
+0.0.5:
+(NOTE: Next release will break some backward compatibility, maybe)
+- Document fix/improvement
+- Add :command-completion to :OpenBrowserSmartSearch.
+- :OpenBrowserSmartSearch: allow {search-engine} option
+  like :OpenBrowserSearch
+- Minor bug fixes
 
 }}}
 ==============================================================================
