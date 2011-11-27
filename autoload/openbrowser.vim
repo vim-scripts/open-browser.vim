@@ -13,14 +13,14 @@ if g:__openbrowser_platform.cygwin
         return ['cygstart']
     endfunction
     function! s:get_default_open_rules()
-        return {'cygstart': '{browser} {shellescape(uri)}'}
+        return {'cygstart': '{browser} {shellescape(uri)} \&'}
     endfunction
 elseif g:__openbrowser_platform.macunix
     function! s:get_default_open_commands()
         return ['open']
     endfunction
     function! s:get_default_open_rules()
-        return {'open': '{browser} {shellescape(uri)}'}
+        return {'open': '{browser} {shellescape(uri)} \&'}
     endfunction
 elseif g:__openbrowser_platform.mswin
     function! s:get_default_open_commands()
@@ -30,7 +30,7 @@ elseif g:__openbrowser_platform.mswin
         " NOTE: On MS Windows, 'start' command is not executable.
         " NOTE: If &shellslash == 1,
         " `shellescape(uri)` uses single quotes not double quote.
-        return {'cmd.exe': 'cmd /c start "openbrowser.vim" "{uri}"'}
+        return {'cmd.exe': 'cmd /c start rundll32 url.dll,FileProtocolHandler {uri}'}
     endfunction
 elseif g:__openbrowser_platform.unix
     function! s:get_default_open_commands()
@@ -38,15 +38,17 @@ elseif g:__openbrowser_platform.unix
     endfunction
     function! s:get_default_open_rules()
         return {
-        \   'xdg-open':      '{browser} {shellescape(uri)}',
-        \   'x-www-browser': '{browser} {shellescape(uri)}',
-        \   'firefox':       '{browser} {shellescape(uri)}',
-        \   'w3m':           '{browser} {shellescape(uri)}',
+        \   'xdg-open':      '{browser} {shellescape(uri)} \&',
+        \   'x-www-browser': '{browser} {shellescape(uri)} \&',
+        \   'firefox':       '{browser} {shellescape(uri)} \&',
+        \   'w3m':           '{browser} {shellescape(uri)} \&',
         \}
     endfunction
 endif
 
-unlet g:__openbrowser_platform
+" Do not remove g:__openbrowser_platform for debug.
+" unlet g:__openbrowser_platform
+
 " }}}
 
 " Global Variables {{{
@@ -141,8 +143,9 @@ function! openbrowser#open(uri) "{{{
     if a:uri =~# '^\s*$'
         return
     endif
-    if g:openbrowser_open_filepath_in_vim && s:seems_path(a:uri)
-        execute g:openbrowser_open_vim_command a:uri
+    if s:get_var('openbrowser_open_filepath_in_vim')
+    \   && s:seems_path(a:uri)
+        execute s:get_var('openbrowser_open_vim_command') a:uri
         return
     endif
 
@@ -150,19 +153,20 @@ function! openbrowser#open(uri) "{{{
     redraw
     echo "opening '" . uri . "' ..."
 
-    for browser in g:openbrowser_open_commands
+    for browser in s:get_var('openbrowser_open_commands')
         if !executable(browser)
             continue
         endif
-        if !has_key(g:openbrowser_open_rules, browser)
+        let open_rules = s:get_var('openbrowser_open_rules')
+        if !has_key(open_rules, browser)
             continue
         endif
 
         let cmdline = s:expand_keyword(
-        \   g:openbrowser_open_rules[browser],
+        \   open_rules[browser],
         \   {'browser': browser, 'uri': uri}
         \)
-        call s:spawn_browser(cmdline)
+        call system(cmdline)
         " No need to check v:shell_error
         " because browser is spawned in background process
         " so can't check its return value.
@@ -179,8 +183,11 @@ endfunction "}}}
 
 " :OpenBrowserSearch
 function! openbrowser#search(query, ...) "{{{
-    let engine = a:0 ? a:1 : g:openbrowser_default_search
-    if !has_key(g:openbrowser_search_engines, engine)
+    let engine = a:0 ? a:1 :
+    \   s:get_var('openbrowser_default_search')
+    let search_engines =
+    \   s:get_var('openbrowser_search_engines')
+    if !has_key(search_engines, engine)
         echohl WarningMsg
         echomsg "Unknown search engine '" . engine . "'."
         echohl None
@@ -188,17 +195,21 @@ function! openbrowser#search(query, ...) "{{{
     endif
 
     call openbrowser#open(
-    \   s:expand_keyword(g:openbrowser_search_engines[engine], {'query': urilib#uri_escape(a:query)})
+    \   s:expand_keyword(search_engines[engine], {'query': urilib#uri_escape(a:query)})
     \)
 endfunction "}}}
 
 " :OpenBrowserSmartSearch
 function! openbrowser#smart_search(query, ...) "{{{
     if s:seems_uri(a:query)
+    \   || (s:get_var('openbrowser_open_filepath_in_vim')
+    \       && s:seems_path(a:query))
         return openbrowser#open(a:query)
     else
-        let engine = a:0 ? a:1 : g:openbrowser_default_search
-        return openbrowser#search(a:query, engine)
+        return openbrowser#search(
+        \   a:query,
+        \   (a:0 ? a:1 : s:get_var('openbrowser_default_search'))
+        \)
     endif
 endfunction "}}}
 
@@ -256,7 +267,7 @@ function! openbrowser#_cmd_complete(unused1, cmdline, unused2) "{{{
     let cmdline = substitute(a:cmdline, excmd, '', '')
 
     let engine_options = map(
-    \   sort(keys(g:openbrowser_search_engines)),
+    \   sort(keys(s:get_var('openbrowser_search_engines'))),
     \   '"-" . v:val'
     \)
     if cmdline ==# '' || cmdline ==# '-'
@@ -313,11 +324,14 @@ function! openbrowser#_keymapping_smart_search(mode) "{{{
 endfunction "}}}
 
 
-
 function! s:seems_path(path) "{{{
-    return
-    \   stridx(a:path, 'file://') ==# 0
-    \   || getftype(a:path) =~# '^\(file\|dir\|link\)$'
+    " - Has no invalid filename character (seeing &fname)
+    " and, either
+    " - file:// prefixed string
+    " - Existed path
+    return (stridx(a:path, 'file://') ==# 0
+    \       || getftype(a:path) !=# '')
+    \   && a:path =~# '^\f\+$'
 endfunction "}}}
 
 function! s:seems_uri(uri) "{{{
@@ -328,8 +342,10 @@ function! s:seems_uri(uri) "{{{
     \   && uri.host() =~# '\.'
 endfunction "}}}
 
+" - If a:uri looks like file path, add "file:///"
+" - Apply settings of g:openbrowser_fix_schemes, g:openbrowser_fix_hosts, g:openbrowser_fix_paths
 function! s:convert_uri(uri) "{{{
-    if s:seems_path(a:uri)
+    if s:seems_path(a:uri)    " File path
         " a:uri is File path. Converts a:uri to `file://` URI.
         if stridx(a:uri, 'file://') ==# 0
             return a:uri
@@ -337,31 +353,32 @@ function! s:convert_uri(uri) "{{{
         let save_shellslash = &shellslash
         let &l:shellslash = 1
         try
-            return 'file:///' . fnamemodify(a:uri, ':p')
+            let uri = fnamemodify(a:uri, ':p')
+            if g:__openbrowser_platform.cygwin
+                return uri
+            else
+                return 'file:///' . uri
+            endif
         finally
             let &l:shellslash = save_shellslash
         endtry
-    endif
-
-    if s:seems_uri(a:uri)
+    elseif s:seems_uri(a:uri)    " URI
         let ERROR = []
         let obj = urilib#new_from_uri_like_string(a:uri, ERROR)
         if obj isnot ERROR
-            call obj.scheme(get(g:openbrowser_fix_schemes, obj.scheme(), obj.scheme()))
-            call obj.host  (get(g:openbrowser_fix_hosts, obj.host(), obj.host()))
-            call obj.path  (get(g:openbrowser_fix_paths, obj.path(), obj.path()))
+            " Fix scheme, host, path.
+            " e.g.: "ttp" => "http"
+            for where in ['scheme', 'host', 'path']
+                let fix = s:get_var('openbrowser_fix_'.where.'s')
+                let value = obj[where]()
+                if has_key(fix, value)
+                    call call(obj[where], [fix[value]])
+                endif
+            endfor
             return obj.to_string()
         endif
+        " Fall through
     endif
-
-    " Neither
-    " - File path
-    " - |urilib| has been installed and |urilib| determine a:uri is URI
-
-    " ...But openbrowser should try to open!
-    " Because a:uri might be URI like "file://...".
-    " In this case, this is not file path and
-    " |urilib| might not have been installed :(.
     return a:uri
 endfunction "}}}
 
@@ -380,11 +397,18 @@ endfunction "}}}
 
 function! s:get_url_on_cursor() "{{{
     let save_iskeyword = &iskeyword
-    let &l:iskeyword = g:openbrowser_iskeyword
+    " Avoid rebuilding of `chartab`.
+    " (declared in globals.h, rebuilt by did_set_string_option() in option.c)
+    if &iskeyword !=# g:openbrowser_iskeyword
+        let &iskeyword = g:openbrowser_iskeyword
+    endif
     try
         return expand('<cword>')
     finally
-        let &l:iskeyword = save_iskeyword
+        " Avoid rebuilding of `chartab`.
+        if &iskeyword !=# save_iskeyword
+            let &iskeyword = save_iskeyword
+        endif
     endtry
 endfunction "}}}
 
@@ -448,15 +472,15 @@ function! s:expand_keyword(str, options)  " {{{
   return result
 endfunction "}}}
 
-" Determine what is used for spawning browser. {{{
-if globpath(&rtp, 'autoload/vimproc.vim') != ''
-    let s:spawn_browser = function('vimproc#system_gui')
-else
-    function! s:spawn_browser(cmdline)
-        return system(a:cmdline . ' &')
-    endfunction
-endif
-" }}}
+function! s:get_var(varname) "{{{
+    for ns in [b:, w:, t:, g:]
+        if has_key(ns, a:varname)
+            return ns[a:varname]
+        endif
+    endfor
+    throw 'openbrowser: internal error: '
+    \   . "s:get_var() couldn't find variable '".a:varname."'."
+endfunction "}}}
 
 " }}}
 
