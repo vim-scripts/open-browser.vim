@@ -2,7 +2,7 @@
 
 Author:
   tyru <tyru.exe@gmail.com>
-Version: 0.0.6a
+Version: 0.0.7
 License: Under the same license as Vim itself (see :help license)
 
 ==============================================================================
@@ -14,7 +14,7 @@ Interface			|openbrowser-interface|
   Variables			|openbrowser-variables|
   Commands			|openbrowser-commands|
   Functions			|openbrowser-functions|
-Platform dependent values		|openbrowser-platform-dependent|
+Avaliable Syntax in Options		|openbrowser-option-syntax|
 Changelog			|openbrowser-changelog|
 
 
@@ -58,7 +58,7 @@ Usage:
 
 }}}
 ==============================================================================
-INTERFACE				*openbrowser-interface* {{{
+INTERFACE							*openbrowser-interface* {{{
 ------------------------------------------------------------------------------
 KEYMAPPINGS					*openbrowser-keymappings* {{{
 
@@ -90,11 +90,34 @@ VARIABLES					*openbrowser-variables* {{{
 
 g:openbrowser_open_commands			*g:openbrowser_open_commands*
 								(default: Platform dependent)
-	See |openbrowser-platform-dependent|.
+	Default value is platform dependant.
+	Cygwin: ["cygstart"]
+	Mac OS X: ["open"]
+	MS Windows: ["cmd.exe"]
+	Unix like environment: ['xdg-open', 'x-www-browser', 'firefox', 'w3m']
 
 g:openbrowser_open_rules			*g:openbrowser_open_rules*
 								(default: Platform dependent)
-	See |openbrowser-platform-dependent|.
+	Default value is platform dependant.
+		Cygwin: {"cygstart": "{browser} {shellescape(uri)}"}
+		Mac OS X: {"open": "{browser} {shellescape(uri)}"}
+		MS Windows: {"cmd.exe": "cmd /c start rundll32 url.dll,FileProtocolHandler {uri}"}
+		Unix like environment: >
+		{
+		\   'xdg-open':      '{browser} {shellescape(uri)}',
+		\   'x-www-browser': '{browser} {shellescape(uri)}',
+		\   'firefox':       '{browser} {shellescape(uri)}',
+		\   'w3m':           '{browser} {shellescape(uri)}',
+		\}
+<
+	Avaliable variables (see |openbrowser-option-syntax| for details)
+		browser:
+			|g:openbrowser_open_commands| is assigned in order.
+			If the browser is not executable or failed
+			to open with the browser, try next browser
+			in |g:openbrowser_open_commands|.
+		uri:
+			URI specified by openbrowser Ex commands.
 
 g:openbrowser_fix_schemes			*g:openbrowser_fix_schemes*
 								(default: {"ttp": "http"})
@@ -161,13 +184,8 @@ g:openbrowser_default_search		*g:openbrowser_default_search*
 
 g:openbrowser_search_engines		*g:openbrowser_search_engines*
 								(default: See below)
-	Default value is: >
-    let g:openbrowser_search_engines = {
-    \   'google': 'http://google.com/search?q={query}',
-    \   'yahoo': 'http://search.yahoo.com/search?p={query}',
-    \}
-<
-	As default, supported search engines are only Google and Yahoo.
+	Default value is very long.
+	See autoload/openbrowser.vim.
 	(You can e-mail me to add more search engines :)
 
 	You can add favorite search engines like: >
@@ -175,6 +193,10 @@ g:openbrowser_search_engines		*g:openbrowser_search_engines*
     \   'favorite': 'http://example.com/search?q={query}',
     \}
 <	{query} will be replaced with given query.
+
+	Avaliable variables (see |openbrowser-option-syntax| for details)
+		query:
+			Query specified by openbrowser Ex commands.
 
 					*g:openbrowser_open_filepath_in_vim*
 g:openbrowser_open_filepath_in_vim
@@ -243,52 +265,37 @@ openbrowser#smart_search({query} [, {search-engine}])			*openbrowser#smart_searc
 }}}
 }}}
 ==============================================================================
-PLATFORM DEPENDENT VALUES		*openbrowser-platform-dependent* {{{
+AVAILABLE SYNTAX IN OPTIONS		*openbrowser-option-syntax* {{{
 
-Cygwin:
-	Match if: `has("win32unix")` is true.
+This syntax was ported by |quickrun|.
+But some feature was disabled intentionally for open-browser.vim.
 
-	g:openbrowser_open_commands g:openbrowser_open_rules ~
-	["cygstart"]				{"cygstart": "{browser} {shellescape(uri)}"}
+open-browser.vim only recognizes these strings:
+- {vim expression}
+- escape character (\).
 
-Mac OS X:
-	Match if: `has("macunix")` is true.
+If query is "var_dump".
 
-	g:openbrowser_open_commands g:openbrowser_open_rules ~
-	["open"]					{"open": "{browser} {shellescape(uri)}"}
+	"http://php.net/{query}" => "http://php.net/var_dump"
 
-MS Windows:
-	Match if: `has("win16") || has("win32") || has("win64")` is true.
+If you would like "{" to stop the behavior,
+you can prepend escape character to "{".
 
-	Note that "start" is not external program,
-	it is cmd.exe builtin command.
-	But you don't have to care it is not executable,
-	because open-browser knows "start" is builtin command.
+	"http://php.net/\{query}" => "http://php.net/{query}"
 
-	g:openbrowser_open_commands g:openbrowser_open_rules ~
-	["start"]					{"start": "&shell &shellcmdflag {browser} {uri}"}
+See |g:openbrowser_open_rules| and |g:openbrowser_search_engines|
+for available variables.
 
-Unix like environment:
-	Match if:
-	it does not match above any environment,
-	and `has("unix")` is true,
-	This is your platform.
-
-	|g:openbrowser_open_commands|
-	['xdg-open', 'x-www-browser', 'firefox', 'w3m']
-
-	|g:openbrowser_open_rules| >
-	{
-	\   'xdg-open':      '{browser} {shellescape(uri)}',
-	\   'x-www-browser': '{browser} {shellescape(uri)}',
-	\   'firefox':       '{browser} {shellescape(uri)}',
-	\   'w3m':           '{browser} {shellescape(uri)}',
-	\}
-<
+In addition, |quickrun| syntax can recognizes these strings:
+- $ENV_NAME
+- &option_name
+- @register
+See :help |quickrun-syntax-option| for details.
 
 }}}
 ==============================================================================
-CHANGELOG						*openbrowser-changelog* {{{
+==============================================================================
+CHANGELOG							*openbrowser-changelog* {{{
 
 0.0.0:
 - Initial upload
@@ -345,6 +352,33 @@ backward compatibility.
 - Sorry, I forgot to note that
   Mac OS X environment detection problem was reported by Chomo.
   Thanks Chomo.
+
+0.0.7:
+- Support some search engines (alphabetically)
+  Most search engines were suggested by stardiviner, thanks!
+  - Ask Ubuntu
+  - Baidu
+  - Blekko
+  - CPAN (search.cpan.org)
+  - DuckDuckGo
+  - GitHub
+  - Google Code (en)
+  - PHP (www.php.net)
+  - Python (docs.python.org)
+  - SPACE ALC
+  - Twitter Search
+  - Twitter (user)
+  - VeryCD
+  - Wikipedia (en)
+  - vim.org
+- Fix bug: command-line completion did not return all matched search engines,
+  it returned only first matched search engine.
+- Fix bug: if the key contains "-" in g:openbrowser_search_engines,
+  it does not work.
+- Change s:expand_keyword() syntax. It recognizes only {vim expression}.
+  (see :help openbrowser-option-syntax for details)
+  - Change default value of g:openbrowser_open_rules
+  - Change default value of g:openbrowser_search_engines
 
 }}}
 ==============================================================================
