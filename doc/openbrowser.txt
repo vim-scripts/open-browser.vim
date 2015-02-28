@@ -2,8 +2,20 @@
 
 Author:
   tyru <tyru.exe@gmail.com>
-Version: 0.0.7
-License: Under the same license as Vim itself (see :help license)
+Version: 0.1.1
+License:
+NEW BSD LICENSE {{{
+  Copyright (c) 2010, tyru
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+      * Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+      * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+      * Neither the name of the tyru nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+}}}
 
 ==============================================================================
 CONTENTS						*openbrowser-contents*
@@ -12,17 +24,20 @@ Introduction		|openbrowser-introduction|
 Interface			|openbrowser-interface|
   Keymappings		|openbrowser-keymappings|
   Variables			|openbrowser-variables|
+  Menus				|openbrowser-menus|
   Commands			|openbrowser-commands|
   Functions			|openbrowser-functions|
-Avaliable Syntax in Options		|openbrowser-option-syntax|
+Available Syntax in Options		|openbrowser-option-syntax|
+FAQ					|openbrowser-faq|
 Changelog			|openbrowser-changelog|
+Thanks			|openbrowser-thanks|
 
 
 ==============================================================================
 INTRODUCTION						*openbrowser-introduction* {{{
 
 
-I recommend this setting.
+Recommended Setting:
 >
 	" My setting.
 	let g:netrw_nogx = 1 " disable netrw's gx mapping.
@@ -42,18 +57,26 @@ Usage:
 	nmap map-you-like <Plug>(openbrowser-search)
 	" Search selected word. vmap map-you-like <Plug>(openbrowser-search)
 
-	" If it looks like URI, Open URI under cursor.
-	" Otherwise, Search word under cursor.
+	" If it looks like URI, open an URI under cursor.
+	" Otherwise, search a word under cursor.
 	nmap map-you-like <Plug>(openbrowser-smart-search)
-	" If it looks like URI, Open selected URI.
-	" Otherwise, Search selected word.
+	" If it looks like URI, open selected URI.
+	" Otherwise, search selected word.
 	vmap map-you-like <Plug>(openbrowser-smart-search)
 
-	" In command-line
+	" Open http://google.com/ in a web browser.
 	:OpenBrowser http://google.com/
-	:OpenBrowserSearch ggrks
-	:OpenBrowserSmartSearch http://google.com/
-	:OpenBrowserSmartSearch ggrks
+	" Search the word "vim". (Default search engine is google)
+	:OpenBrowserSearch vim
+	" Search the word "openbrowser" in www.vim.org .
+	:OpenBrowserSearch -vim openbrowser
+	" If it looks like URL, open the URL in a web browser.
+	:OpenBrowserSmartSearch http://www.vim.org/
+	" If it does not look like URL, open the word
+	" in the default search engine.
+	:OpenBrowserSmartSearch emacs download
+	" Also you can specify another search engine.
+	:OpenBrowserSmartSearch -github tyru
 
 
 }}}
@@ -63,9 +86,7 @@ INTERFACE							*openbrowser-interface* {{{
 KEYMAPPINGS					*openbrowser-keymappings* {{{
 
 n <Plug>(openbrowser-open)				|<Plug>(openbrowser-open)|
-	Open current text under cursor with |:OpenBrowser|.
-	You can customize the definition of "text"
-	with |g:openbrowser_iskeyword|.
+	Open current URL under cursor with |:OpenBrowser|.
 
 v <Plug>(openbrowser-open)				|<Plug>(openbrowser-open)|
 	Open selected text with |:OpenBrowser|.
@@ -88,36 +109,43 @@ v <Plug>(openbrowser-smart-search)	|<Plug>(openbrowser-smart-search)|
 ------------------------------------------------------------------------------
 VARIABLES					*openbrowser-variables* {{{
 
-g:openbrowser_open_commands			*g:openbrowser_open_commands*
+g:openbrowser_browser_commands		*g:openbrowser_browser_commands*
 								(default: Platform dependent)
 	Default value is platform dependant.
-	Cygwin: ["cygstart"]
-	Mac OS X: ["open"]
-	MS Windows: ["cmd.exe"]
-	Unix like environment: ['xdg-open', 'x-www-browser', 'firefox', 'w3m']
+	Cygwin:
+		[
+		\ {"name": "cygstart",
+		\  "args": ["{browser}", "{uri}"]}
+		\]
+	Mac OS X:
+		[
+		\ {"name": "open",
+		\  "args": ["{browser}", "{uri}"]}
+		\]
+	MS Windows:
+		[
+		\ {"name": "rundll32",
+		\  "args": "rundll32 url.dll,FileProtocolHandler {uri}"}
+		\]
+	Unix like environment:
+		[
+		\ {"name": "xdg-open",
+		\  "args": ["{browser}", "{uri}"]},
+		\ {"name": "x-www-browser",
+		\  "args": ["{browser}", "{uri}"]},
+		\ {"name": "firefox",
+		\  "args": ["{browser}", "{uri}"]},
+		\ {"name": "w3m",
+		\  "args": ["{browser}", "{uri}"]},
+		\]
 
+g:openbrowser_open_commands			*g:openbrowser_open_commands*
 g:openbrowser_open_rules			*g:openbrowser_open_rules*
-								(default: Platform dependent)
-	Default value is platform dependant.
-		Cygwin: {"cygstart": "{browser} {shellescape(uri)}"}
-		Mac OS X: {"open": "{browser} {shellescape(uri)}"}
-		MS Windows: {"cmd.exe": "cmd /c start rundll32 url.dll,FileProtocolHandler {uri}"}
-		Unix like environment: >
-		{
-		\   'xdg-open':      '{browser} {shellescape(uri)}',
-		\   'x-www-browser': '{browser} {shellescape(uri)}',
-		\   'firefox':       '{browser} {shellescape(uri)}',
-		\   'w3m':           '{browser} {shellescape(uri)}',
-		\}
-<
-	Avaliable variables (see |openbrowser-option-syntax| for details)
-		browser:
-			|g:openbrowser_open_commands| is assigned in order.
-			If the browser is not executable or failed
-			to open with the browser, try next browser
-			in |g:openbrowser_open_commands|.
-		uri:
-			URI specified by openbrowser Ex commands.
+	NOTE: Deprecated.
+	(if you have existing setting openbrowser.vim converts them
+	into |g:openbrowser_browser_commands|.
+	but these variable might be going to be removed for the next release)
+	Use |g:openbrowser_browser_commands| instead.
 
 g:openbrowser_fix_schemes			*g:openbrowser_fix_schemes*
 								(default: {"ttp": "http"})
@@ -163,19 +191,6 @@ g:openbrowser_fix_paths				*g:openbrowser_fix_paths*
 <	It is fixed to: >
 		http://yahoo.com/tyru
 <
-g:openbrowser_isfname				*g:openbrowser_isfname*
-								(default: See |g:openbrowser_iskeyword|)
-	Now this variable is deprecated.
-	Use |g:openbrowser_iskeyword| instead.
-	NOTE: This works like |g:openbrowser_iskeyword|
-	for backward compatibility.
-
-g:openbrowser_iskeyword				*g:openbrowser_iskeyword*
-								(default: Very long.
-								see autoload/openbrowser.vim)
-	|<Plug>(openbrowser-open)| opens <cword> text in normal mode.
-	This variable temporarily changes 'iskeyword' option value at that time.
-
 g:openbrowser_default_search		*g:openbrowser_default_search*
 								(default: "google")
 	Key of Dictionary |g:openbrowser_search_engines|.
@@ -194,7 +209,7 @@ g:openbrowser_search_engines		*g:openbrowser_search_engines*
     \}
 <	{query} will be replaced with given query.
 
-	Avaliable variables (see |openbrowser-option-syntax| for details)
+	Available variables (see |openbrowser-option-syntax| for details)
 		query:
 			Query specified by openbrowser Ex commands.
 
@@ -211,6 +226,97 @@ g:openbrowser_open_vim_command
 								(default: "vsplit")
 	This value is used for opening looks-like-a-path string.
 	See |g:openbrowser_open_filepath_in_vim| for the details.
+
+					*g:openbrowser_format_message*
+g:openbrowser_format_message
+								(default: See below)
+
+	Default value is:
+>
+	let g:openbrowser_format_message = {
+	\   'msg': "opening '{uri}' ... {done ? 'done! ({command})' : ''}",
+	\   'truncate': 1,
+	\   'min_uri_len': 15,
+	\}
+<
+	In the "msg" key's value, you can use some existing variables:
+
+	uri: URI to open
+	done: zero before opening URI, non-zero afterward
+
+	If the value is empty string,
+	openbrowser does not output any message when opening URL.
+	If the value is not empty string,
+	convert by its format and output to command-line.
+	See |openbrowser-option-syntax| about detailed syntax description
+	for the format.
+
+	If "truncate" key's value is non-zero,
+	openbrowser outputs a truncated message
+	when the message is enough long to show |hit-enter-prompt|.
+	If the value is zero, openbrowser does not truncate
+	the output message.
+	Here is the truncating algorithm:
+
+	1. Remove "http" or "https" protocol in URI(URL).
+	2. After 1, if URI is longer than command-line, then
+		2.1. Truncate URI as possible as
+		     |g:openbrowser_format_message|.min_uri_len is allowed.
+		2.2. After 2.1, if URI is longer than command-line, then
+			2.2.1. Truncate whole string.
+
+					*g:openbrowser_use_vimproc*
+g:openbrowser_use_vimproc
+								(default: 1)
+	If this value is non-zero and vimproc is installed,
+	use vimproc to open a URL.
+
+					*g:openbrowser_no_default_menus*
+g:openbrowser_no_default_menus
+								(default: None)
+	If this value is defined and non-zero,
+	do not define default menus.
+	See |openbrowser-menus| for the default menus.
+
+g:openbrowser_menu_lang		*g:openbrowser_menu_lang*
+					(default: 'langmenu' or |v:lang|)
+	If the value is specified and not empty string, the value is used.
+	Or, the following values are used by the following order.
+	The first non empty string is used.
+	(This is what $VIMRUNTIME/menu.vim does)
+
+	1. 'langmenu'
+	2. |v:lang|
+
+	Value	Meaning
+	-----	-------
+	"ja"	Japanese
+	"en"	English
+
+	If the value is not any of above values,
+	fallback to English menu.
+
+					*g:openbrowser_force_foreground_after_open*
+g:openbrowser_force_foreground_after_open
+								(default: 0)
+	If this value is non-zero,
+	make Vim foreground after opening URL or searching word(s).
+
+}}}
+------------------------------------------------------------------------------
+MENUS					*openbrowser-menus* {{{
+
+						*openbrowser-menu-open*
+PopUp.Open URL	(modes: n, v)
+	This is same as |<Plug>(openbrowser-open)|.
+
+						*openbrowser-menu-search*
+PopUp.Open Word(s)	(modes: n, v)
+	This is same as |<Plug>(openbrowser-search)|.
+
+						*openbrowser-menu-smart-search*
+PopUp.Open URL or Word(s)	(modes: n, v)
+	This is same as |<Plug>(openbrowser-smart-search)|.
 
 }}}
 ------------------------------------------------------------------------------
@@ -294,6 +400,15 @@ See :help |quickrun-syntax-option| for details.
 
 }}}
 ==============================================================================
+FAQ							*openbrowser-faq* {{{
+
+Q. How to open a current file in browser?
+A. Define the following command.
+>
+	command! OpenBrowserCurrent execute "OpenBrowser" "file:///" . expand('%:p:gs?\\?/?')
+<
+
+}}}
 ==============================================================================
 CHANGELOG							*openbrowser-changelog* {{{
 
@@ -379,6 +494,39 @@ backward compatibility.
   (see :help openbrowser-option-syntax for details)
   - Change default value of g:openbrowser_open_rules
   - Change default value of g:openbrowser_search_engines
+
+0.1.1:
+- Avoid hit-enter-prompt when opening URL
+- Add English/Japanese menus
+- Allow to disable the default search engines
+- Add g:openbrowser_short_message
+- Improve URI/URL handling
+- Improve vimproc.vim integration
+- Improve open-browser-github.vim integration
+- Improve ghq command integration
+- Change structure of g:openbrowser_browser_commands
+- Remove g:openbrowser_{isfname,iskeyword}
+- ...and fixed many many problems...
+
+}}}
+==============================================================================
+THANKS                                                     *openbrowser-thanks* {{{
+
+The below list is the people who gave patch, advice, etc.
+Great thanks for the peoples. (alphabetical order)
+
+* Daniel Hahler (@blueyed)
+* Ingo Karkat (@inkarkat)
+* Kazuhiro YOSHIKAWA (@yoshikaw)
+* Milly (@Milly)
+* Yasuhiro MATSUMOTO (@mattn)
+* Yukihiro Nakadaira (@ynkdir)
+* basyura (@basyura)
+* chikatoike (@chikatoike)
+* crazymaster (@crazymaster)
+* itchyny (@itchyny)
+* stardiviner (@stardiviner)
+* toooooooby (@toooooooby)
 
 }}}
 ==============================================================================
